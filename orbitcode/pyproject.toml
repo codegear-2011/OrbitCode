@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orbitcode"
+version = "0.1.0"
+description = "Circular graph-based 2D codes: MonoOrbit (print-safe), ColourOrbit, and optional SecureOrbit encryption/signing"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.23",
+    "opencv-python-headless>=4.7",
+    "pillow>=9.0",
+    "cryptography>=41",
+]
+keywords = ["qr", "2d-code", "ldpc", "barcode", "encryption"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Graphics",
+    "Development Status :: 3 - Alpha",
+]
+
+[project.optional-dependencies]
+web = ["flask>=2.2"]
+dev = ["pytest", "flask>=2.2"]
+
+[project.scripts]
+orbitcode = "orbitcode.cli:main"
+orbitcode-web = "orbitcode.web:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+orbitcode = ["templates/*.html", "static/*.css"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

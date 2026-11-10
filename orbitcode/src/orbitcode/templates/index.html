@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="bn">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OrbitCode</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>OrbitCode</h1>
+    <p>বৃত্তাকার কক্ষপথে সাজানো নোড ও সংযোগ-রেখার কোড। দুটো সংস্করণ: কালো-ধূসর <b>MonoOrbit™</b> ও রঙিন <b>ColourOrbit™</b>। চাইলে <b>SecureOrbit™</b> নিরাপত্তা-স্তর যোগ করা যায়।</p>
+  </header>
+
+  <main>
+    <section aria-labelledby="enc">
+      <h2 id="enc">কোড বানান</h2>
+
+      <fieldset>
+        <legend>সংস্করণ</legend>
+        <label class="opt"><input type="radio" name="ver" value="mono" checked> MonoOrbit™ <small>কালো-ধূসর, সাদা কাগজে ছাপার জন্য</small></label>
+        <label class="opt"><input type="radio" name="ver" value="colour"> ColourOrbit™ <small>রঙিন, গাঢ় পটভূমি, স্ক্রিনের জন্য</small></label>
+      </fieldset>
+
+      <label for="text">যে লেখা কোডে রাখবেন</label>
+      <textarea id="text" rows="5" placeholder="এখানে লিখুন…"></textarea>
+
+      <details id="sec">
+        <summary>SecureOrbit™ নিরাপত্তা <small>(ঐচ্ছিক, বন্ধ থাকলে কোড খোলা ও ক্ষমতা পুরো)</small></summary>
+        <label for="pw">পাসওয়ার্ড দিয়ে এনক্রিপ্ট <small>(ফাঁকা রাখলে এনক্রিপশন নেই)</small></label>
+        <input id="pw" type="password" autocomplete="new-password">
+        <label for="sk">স্বাক্ষরের private key, hex <small>(ফাঁকা রাখলে স্বাক্ষর নেই)</small></label>
+        <input id="sk" type="password" autocomplete="off">
+        <button id="kg" type="button" class="ghost">নতুন key জোড়া তৈরি করুন</button>
+        <pre id="keys" hidden></pre>
+      </details>
+
+      <p class="hint" id="cap"></p>
+      <button id="encBtn" type="button">কোড তৈরি করুন</button>
+      <p id="encErr" class="err" role="alert"></p>
+      <figure id="out" hidden>
+        <img id="outImg" alt="তৈরি হওয়া OrbitCode">
+        <a id="dl" download="orbit-code.png" class="btn">PNG নামান</a>
+      </figure>
+    </section>
+
+    <section aria-labelledby="dec">
+      <h2 id="dec">কোড পড়ুন</h2>
+      <label for="files">কোডের ছবি (একাধিক হলে একসঙ্গে যোগ হয়ে নির্ভুলতা বাড়ে; সংস্করণ নিজে চেনা হয়)</label>
+      <input id="files" type="file" accept="image/*" multiple>
+      <div id="thumbs"></div>
+      <label for="dpw">পাসওয়ার্ড <small>(শুধু SecureOrbit কোডে)</small></label>
+      <input id="dpw" type="password" autocomplete="off">
+      <label for="vk">স্বাক্ষর যাচাইয়ের public key, hex <small>(ঐচ্ছিক)</small></label>
+      <input id="vk" type="text" autocomplete="off">
+      <button id="decBtn" type="button">কোড পড়ুন</button>
+      <p id="decErr" class="err" role="alert"></p>
+      <p id="info" class="hint"></p>
+      <pre id="result" hidden></pre>
+    </section>
+  </main>
+
+  <script>
+    const caps = {{ caps | tojson }};
+    const $ = id => document.getElementById(id);
+    const ver = () => document.querySelector('input[name=ver]:checked').value;
+
+    function updateCap() {
+      const n = caps[ver()] - caps.ovh.base - ($("pw").value ? caps.ovh.pw : 0) - ($("sk").value ? caps.ovh.sig : 0);
+      $("cap").textContent = `সর্বোচ্চ প্রায় ${Math.max(n, 0)} বাইট (সংকোচনের পরে আরও বেশি ধরে)।`;
+    }
+    document.querySelectorAll("input[name=ver], #pw, #sk").forEach(e => e.addEventListener("input", updateCap));
+    updateCap();
+
+    $("kg").onclick = async () => {
+      const j = await (await fetch("/api/keygen", {method: "POST"})).json();
+      $("sk").value = j.private; updateCap();
+      $("keys").textContent = `public key (যাচাইকারীকে দিন):\n${j.public}\n\nprivate key (গোপন রাখুন, উপরের ঘরে বসানো হয়েছে):\n${j.private}`;
+      $("keys").hidden = false;
+    };
+
+    $("encBtn").onclick = async () => {
+      $("encErr").textContent = ""; $("encBtn").disabled = true;
+      try {
+        const r = await fetch("/api/encode", {
+          method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({text: $("text").value, version: ver(), password: $("pw").value, sign_key: $("sk").value})
+        });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error);
+        $("outImg").src = j.image; $("dl").href = j.image; $("out").hidden = false;
+      } catch (e) { $("encErr").textContent = e.message; }
+      $("encBtn").disabled = false;
+    };
+
+    $("files").onchange = () => {
+      $("thumbs").replaceChildren(...[...$("files").files].map(f => {
+        const i = new Image(); i.src = URL.createObjectURL(f); i.alt = f.name; return i;
+      }));
+    };
+
+    $("decBtn").onclick = async () => {
+      $("decErr").textContent = ""; $("info").textContent = ""; $("result").hidden = true;
+      const fd = new FormData();
+      [...$("files").files].forEach(f => fd.append("images", f));
+      fd.append("password", $("dpw").value); fd.append("verify_key", $("vk").value);
+      $("decBtn").disabled = true;
+      try {
+        const r = await fetch("/api/decode", {method: "POST", body: fd});
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error);
+        const sig = {none: "স্বাক্ষর নেই", unchecked: "স্বাক্ষর আছে, কিন্তু key না দেওয়ায় যাচাই হয়নি", valid: "স্বাক্ষর বৈধ"}[j.info.signature];
+        $("info").textContent = `${j.info.version === "mono" ? "MonoOrbit" : "ColourOrbit"} · ${j.info.encrypted ? "এনক্রিপ্টেড" : "খোলা"} · ${sig} · ফ্রেম: ${j.info.frames}`;
+        $("result").textContent = j.text; $("result").hidden = false;
+      } catch (e) { $("decErr").textContent = e.message; }
+      $("decBtn").disabled = false;
+    };
+  </script>
+</body>
+</html>
